@@ -5,6 +5,7 @@ const storageKey = 'meditation-tracker-2025';
 const API_URL = 'https://meditation-tracker-backend.onrender.com/api';
 
 let data = JSON.parse(localStorage.getItem(storageKey)) || {};
+let hasUnsavedChanges = false;
 
 async function fetchData(retryCount = 0) {
   try {
@@ -27,7 +28,14 @@ async function fetchData(retryCount = 0) {
 }
 
 async function saveData(retryCount = 0) {
+  const saveButton = document.getElementById('saveButton');
+  const saveStatus = document.getElementById('saveStatus');
+  
   try {
+    saveButton.disabled = true;
+    saveStatus.textContent = 'Saving...';
+    saveStatus.className = 'save-status';
+    
     const response = await fetch(`${API_URL}/data`, {
       method: 'POST',
       headers: {
@@ -44,13 +52,26 @@ async function saveData(retryCount = 0) {
     if (result.success) {
       data = result.data;
       localStorage.setItem(storageKey, JSON.stringify(data));
+      saveStatus.textContent = 'Saved successfully!';
+      saveStatus.className = 'save-status success';
+      hasUnsavedChanges = false;
+    } else {
+      throw new Error('Failed to save data');
     }
   } catch (error) {
     console.error('Error saving data:', error);
+    saveStatus.textContent = 'Error saving data';
+    saveStatus.className = 'save-status error';
     if (retryCount < 3) {
       console.log(`Retrying... Attempt ${retryCount + 1}`);
       setTimeout(() => saveData(retryCount + 1), 2000);
     }
+  } finally {
+    saveButton.disabled = false;
+    setTimeout(() => {
+      saveStatus.textContent = '';
+      saveStatus.className = 'save-status';
+    }, 3000);
   }
 }
 
@@ -138,26 +159,8 @@ async function toggleTick(user, dateStr) {
     }
     
     data[user][dateStr] = !data[user][dateStr];
-    
-    const response = await fetch(`${API_URL}/data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    if (result.success) {
-      data = result.data;
-      localStorage.setItem(storageKey, JSON.stringify(data));
-      renderDetailedStreaks();
-      renderCalendar();
-    }
+    hasUnsavedChanges = true;
+    updateUI();
   } catch (error) {
     console.error('Error toggling tick:', error);
   }
@@ -277,18 +280,21 @@ function updateUI() {
   renderCalendar();
 }
 
-async function initialize() {
-  try {
+function initialize() {
+  fetchData();
+  updateUI();
+  
+  const saveButton = document.getElementById('saveButton');
+  saveButton.addEventListener('click', () => {
+    if (hasUnsavedChanges) {
+      saveData();
+    }
+  });
+  
+  setInterval(async () => {
     await fetchData();
     updateUI();
-    
-    setInterval(async () => {
-      await fetchData();
-      updateUI();
-    }, 5000);
-  } catch (error) {
-    console.error('Error initializing:', error);
-  }
+  }, 5000);
 }
 
 initialize();
