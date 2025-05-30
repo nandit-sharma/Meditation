@@ -6,7 +6,7 @@ const API_URL = 'https://meditation-tracker-backend.onrender.com/api';
 
 let data = JSON.parse(localStorage.getItem(storageKey)) || {};
 
-async function fetchData() {
+async function fetchData(retryCount = 0) {
   try {
     const response = await fetch(`${API_URL}/data`);
     if (!response.ok) {
@@ -19,10 +19,14 @@ async function fetchData() {
     }
   } catch (error) {
     console.error('Error fetching data:', error);
+    if (retryCount < 3) {
+      console.log(`Retrying... Attempt ${retryCount + 1}`);
+      setTimeout(() => fetchData(retryCount + 1), 2000);
+    }
   }
 }
 
-async function saveData() {
+async function saveData(retryCount = 0) {
   try {
     const response = await fetch(`${API_URL}/data`, {
       method: 'POST',
@@ -43,6 +47,10 @@ async function saveData() {
     }
   } catch (error) {
     console.error('Error saving data:', error);
+    if (retryCount < 3) {
+      console.log(`Retrying... Attempt ${retryCount + 1}`);
+      setTimeout(() => saveData(retryCount + 1), 2000);
+    }
   }
 }
 
