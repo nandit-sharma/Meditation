@@ -18,16 +18,23 @@ app.use(bodyParser.json());
 
 let meditationData = {};
 
+function ensureDataFile() {
+  try {
+    if (!fs.existsSync(dataFile)) {
+      fs.writeFileSync(dataFile, JSON.stringify({}, null, 2), 'utf8');
+      console.log('Created new data file');
+    }
+  } catch (error) {
+    console.error('Error ensuring data file:', error);
+  }
+}
+
 function loadData() {
   try {
-    if (fs.existsSync(dataFile)) {
-      const data = fs.readFileSync(dataFile, 'utf8');
-      meditationData = JSON.parse(data);
-      console.log('Data loaded successfully');
-    } else {
-      fs.writeFileSync(dataFile, JSON.stringify({}, null, 2));
-      console.log('New data file created');
-    }
+    ensureDataFile();
+    const data = fs.readFileSync(dataFile, 'utf8');
+    meditationData = JSON.parse(data);
+    console.log('Data loaded successfully');
   } catch (error) {
     console.error('Error loading data:', error);
     meditationData = {};
@@ -36,18 +43,19 @@ function loadData() {
 
 function saveData() {
   try {
+    ensureDataFile();
     const backupFile = `${dataFile}.backup`;
+    
     if (fs.existsSync(dataFile)) {
       fs.copyFileSync(dataFile, backupFile);
     }
-    fs.writeFileSync(dataFile, JSON.stringify(meditationData, null, 2));
+    
+    const dataToSave = JSON.stringify(meditationData, null, 2);
+    fs.writeFileSync(dataFile, dataToSave, 'utf8');
     console.log('Data saved successfully');
     return true;
   } catch (error) {
     console.error('Error saving data:', error);
-    if (fs.existsSync(backupFile)) {
-      fs.copyFileSync(backupFile, dataFile);
-    }
     return false;
   }
 }
@@ -94,4 +102,5 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Data file location: ${dataFile}`);
 }); 

@@ -1,7 +1,12 @@
 #!/bin/bash
-cp ../index.html .
-cp ../script.js .
-cp ../styles.css .
-if [ ! -f data.json ]; then
-  echo "{}" > data.json
-fi 
+
+echo "Installing dependencies..."
+npm install
+
+echo "Creating data directory and file..."
+mkdir -p data
+touch data.json
+chmod 666 data.json
+
+echo "Starting server..."
+node server.js 
