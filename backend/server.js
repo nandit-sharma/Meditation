@@ -6,7 +6,7 @@ const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const dataFile = path.join(__dirname, 'data.json');
+const dataFile = path.join(__dirname, 'data', 'data.json');
 
 app.use(cors({
   origin: '*',
@@ -20,12 +20,17 @@ let meditationData = {};
 
 function ensureDataFile() {
   try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
     if (!fs.existsSync(dataFile)) {
       fs.writeFileSync(dataFile, JSON.stringify({}, null, 2), 'utf8');
       console.log('Created new data file');
     }
   } catch (error) {
     console.error('Error ensuring data file:', error);
+    throw error;
   }
 }
 

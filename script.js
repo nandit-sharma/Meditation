@@ -2,7 +2,7 @@ const users = ['Nandit', 'Daksh', 'Harish', 'Samar'];
 const startDate = new Date('2025-05-01');
 const endDate = new Date('2025-12-31');
 const storageKey = 'meditation-tracker-2025';
-const API_URL = 'https://meditation-tracker-backend.onrender.com/api';
+const API_URL = 'http://localhost:3000/api';
 
 let data = JSON.parse(localStorage.getItem(storageKey)) || {};
 let hasUnsavedChanges = false;
