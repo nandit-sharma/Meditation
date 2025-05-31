@@ -2,32 +2,11 @@ const users = ['Nandit', 'Daksh', 'Harish', 'Samar'];
 const startDate = new Date('2025-05-01');
 const endDate = new Date('2025-12-31');
 const storageKey = 'meditation-tracker-2025';
-const API_URL = 'http://localhost:3000/api';
 
 let data = JSON.parse(localStorage.getItem(storageKey)) || {};
 let hasUnsavedChanges = false;
 
-async function fetchData(retryCount = 0) {
-  try {
-    const response = await fetch(`${API_URL}/data`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const serverData = await response.json();
-    if (Object.keys(serverData).length > 0) {
-      data = serverData;
-      localStorage.setItem(storageKey, JSON.stringify(data));
-    }
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    if (retryCount < 3) {
-      console.log(`Retrying... Attempt ${retryCount + 1}`);
-      setTimeout(() => fetchData(retryCount + 1), 2000);
-    }
-  }
-}
-
-async function saveData(retryCount = 0) {
+function saveData() {
   const saveButton = document.getElementById('saveButton');
   const saveStatus = document.getElementById('saveStatus');
   
@@ -40,43 +19,33 @@ async function saveData(retryCount = 0) {
       throw new Error('No data to save');
     }
     
-    const response = await fetch(`${API_URL}/data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    if (result.success) {
-      data = result.data;
-      localStorage.setItem(storageKey, JSON.stringify(data));
-      saveStatus.textContent = 'Saved successfully!';
-      saveStatus.className = 'save-status success';
-      hasUnsavedChanges = false;
-    } else {
-      throw new Error('Failed to save data');
-    }
+    localStorage.setItem(storageKey, JSON.stringify(data));
+    saveStatus.textContent = 'Saved successfully!';
+    saveStatus.className = 'save-status success';
+    hasUnsavedChanges = false;
+    console.log('Data saved successfully');
   } catch (error) {
     console.error('Error saving data:', error);
     saveStatus.textContent = `Error: ${error.message}`;
     saveStatus.className = 'save-status error';
-    if (retryCount < 3) {
-      console.log(`Retrying... Attempt ${retryCount + 1}`);
-      setTimeout(() => saveData(retryCount + 1), 2000);
-    }
   } finally {
     saveButton.disabled = false;
     setTimeout(() => {
       saveStatus.textContent = '';
       saveStatus.className = 'save-status';
     }, 3000);
+  }
+}
+
+function loadData() {
+  try {
+    const savedData = localStorage.getItem(storageKey);
+    if (savedData) {
+      data = JSON.parse(savedData);
+      console.log('Data loaded successfully');
+    }
+  } catch (error) {
+    console.error('Error loading data:', error);
   }
 }
 
@@ -286,7 +255,7 @@ function updateUI() {
 }
 
 function initialize() {
-  fetchData();
+  loadData();
   updateUI();
   
   const saveButton = document.getElementById('saveButton');
@@ -295,11 +264,6 @@ function initialize() {
       saveData();
     }
   });
-  
-  setInterval(async () => {
-    await fetchData();
-    updateUI();
-  }, 5000);
 }
 
 initialize();

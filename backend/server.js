@@ -9,9 +9,10 @@ const port = process.env.PORT || 3000;
 const dataFile = path.join(__dirname, 'data', 'data.json');
 
 app.use(cors({
-  origin: '*',
+  origin: ['https://meditation-tracker.onrender.com', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type'],
+  credentials: true
 }));
 
 app.use(bodyParser.json({ limit: '10mb' }));
