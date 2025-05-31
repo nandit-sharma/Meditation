@@ -20,6 +20,7 @@ async function saveData() {
       throw new Error('No data to save');
     }
     
+    console.log('Attempting to save data to:', `${API_URL}/data`);
     const response = await fetch(`${API_URL}/data`, {
       method: 'POST',
       headers: {
@@ -29,8 +30,13 @@ async function saveData() {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to save to server');
+      const errorText = await response.text();
+      console.error('Server response:', response.status, errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
+    
+    const result = await response.json();
+    console.log('Server response:', result);
     
     saveStatus.textContent = 'Saved successfully!';
     saveStatus.className = 'save-status success';
@@ -40,6 +46,10 @@ async function saveData() {
     console.error('Error saving data:', error);
     saveStatus.textContent = `Error: ${error.message}`;
     saveStatus.className = 'save-status error';
+    
+    if (error.message.includes('Failed to fetch')) {
+      console.log('Network error - please check if the server is running');
+    }
   } finally {
     saveButton.disabled = false;
     setTimeout(() => {
@@ -51,14 +61,22 @@ async function saveData() {
 
 async function loadData() {
   try {
+    console.log('Attempting to load data from:', `${API_URL}/data`);
     const response = await fetch(`${API_URL}/data`);
+    
     if (!response.ok) {
-      throw new Error('Failed to load from server');
+      const errorText = await response.text();
+      console.error('Server response:', response.status, errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
+    
     data = await response.json();
-    console.log('Data loaded successfully');
+    console.log('Data loaded successfully:', data);
   } catch (error) {
     console.error('Error loading data:', error);
+    if (error.message.includes('Failed to fetch')) {
+      console.log('Network error - please check if the server is running');
+    }
     data = {};
   }
 }
