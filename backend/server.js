@@ -38,11 +38,19 @@ function loadData() {
   try {
     ensureDataFile();
     const data = fs.readFileSync(dataFile, 'utf8');
+    if (!data || data.trim() === '') {
+      console.log('Data file is empty, initializing with empty object');
+      meditationData = {};
+      saveData();
+      return;
+    }
     meditationData = JSON.parse(data);
     console.log('Data loaded successfully');
   } catch (error) {
     console.error('Error loading data:', error);
+    console.log('Initializing with empty data');
     meditationData = {};
+    saveData();
   }
 }
 
@@ -86,6 +94,9 @@ app.get('/api/data', (req, res) => {
 app.post('/api/data', (req, res) => {
   try {
     console.log('POST /api/data request received');
+    if (!req.body || typeof req.body !== 'object') {
+      throw new Error('Invalid data format');
+    }
     meditationData = req.body;
     const saved = saveData();
     if (saved) {
