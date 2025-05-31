@@ -9,7 +9,9 @@ const port = process.env.PORT || 3000;
 const dataFile = path.join(__dirname, 'data', 'data.json');
 
 app.use(cors({
-  origin: ['https://meditation-tracker.onrender.com', 'http://localhost:3000'],
+  origin: process.env.NODE_ENV === 'production' 
+    ? '*'  // Allow all origins in production
+    : ['http://localhost:3000'],  // Only allow localhost in development
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
   credentials: true
