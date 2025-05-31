@@ -14,7 +14,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type']
 }));
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
 
 let meditationData = {};
 
@@ -44,8 +44,15 @@ function loadData() {
       saveData();
       return;
     }
-    meditationData = JSON.parse(data);
-    console.log('Data loaded successfully');
+    try {
+      meditationData = JSON.parse(data);
+      console.log('Data loaded successfully');
+    } catch (parseError) {
+      console.error('Error parsing data file:', parseError);
+      console.log('Initializing with empty data due to parse error');
+      meditationData = {};
+      saveData();
+    }
   } catch (error) {
     console.error('Error loading data:', error);
     console.log('Initializing with empty data');
@@ -97,16 +104,24 @@ app.post('/api/data', (req, res) => {
     if (!req.body || typeof req.body !== 'object') {
       throw new Error('Invalid data format');
     }
-    meditationData = req.body;
+    
+    const newData = req.body;
+    if (Object.keys(newData).length === 0) {
+      throw new Error('Empty data received');
+    }
+    
+    meditationData = newData;
     const saved = saveData();
+    
     if (saved) {
+      console.log('Data saved successfully:', meditationData);
       res.json({ success: true, data: meditationData });
     } else {
-      res.status(500).json({ error: 'Failed to save data' });
+      throw new Error('Failed to save data to file');
     }
   } catch (error) {
     console.error('Error in POST /api/data:', error);
-    res.status(500).json({ error: 'Failed to update data' });
+    res.status(500).json({ error: error.message || 'Failed to update data' });
   }
 });
 

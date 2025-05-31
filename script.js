@@ -36,6 +36,10 @@ async function saveData(retryCount = 0) {
     saveStatus.textContent = 'Saving...';
     saveStatus.className = 'save-status';
     
+    if (Object.keys(data).length === 0) {
+      throw new Error('No data to save');
+    }
+    
     const response = await fetch(`${API_URL}/data`, {
       method: 'POST',
       headers: {
@@ -45,7 +49,8 @@ async function saveData(retryCount = 0) {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
     
     const result = await response.json();
@@ -60,7 +65,7 @@ async function saveData(retryCount = 0) {
     }
   } catch (error) {
     console.error('Error saving data:', error);
-    saveStatus.textContent = 'Error saving data';
+    saveStatus.textContent = `Error: ${error.message}`;
     saveStatus.className = 'save-status error';
     if (retryCount < 3) {
       console.log(`Retrying... Attempt ${retryCount + 1}`);
