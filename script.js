@@ -2,11 +2,12 @@ const users = ['Nandit', 'Daksh', 'Harish', 'Samar'];
 const startDate = new Date('2025-05-01');
 const endDate = new Date('2025-12-31');
 const storageKey = 'meditation-tracker-2025';
+const API_URL = 'https://meditation-tracker.onrender.com/api';
 
-let data = JSON.parse(localStorage.getItem(storageKey)) || {};
+let data = {};
 let hasUnsavedChanges = false;
 
-function saveData() {
+async function saveData() {
   const saveButton = document.getElementById('saveButton');
   const saveStatus = document.getElementById('saveStatus');
   
@@ -19,7 +20,18 @@ function saveData() {
       throw new Error('No data to save');
     }
     
-    localStorage.setItem(storageKey, JSON.stringify(data));
+    const response = await fetch(`${API_URL}/data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to save to server');
+    }
+    
     saveStatus.textContent = 'Saved successfully!';
     saveStatus.className = 'save-status success';
     hasUnsavedChanges = false;
@@ -37,15 +49,17 @@ function saveData() {
   }
 }
 
-function loadData() {
+async function loadData() {
   try {
-    const savedData = localStorage.getItem(storageKey);
-    if (savedData) {
-      data = JSON.parse(savedData);
-      console.log('Data loaded successfully');
+    const response = await fetch(`${API_URL}/data`);
+    if (!response.ok) {
+      throw new Error('Failed to load from server');
     }
+    data = await response.json();
+    console.log('Data loaded successfully');
   } catch (error) {
     console.error('Error loading data:', error);
+    data = {};
   }
 }
 
@@ -254,8 +268,8 @@ function updateUI() {
   renderCalendar();
 }
 
-function initialize() {
-  loadData();
+async function initialize() {
+  await loadData();
   updateUI();
   
   const saveButton = document.getElementById('saveButton');
@@ -266,4 +280,4 @@ function initialize() {
   });
 }
 
-initialize();
+document.addEventListener('DOMContentLoaded', initialize);
