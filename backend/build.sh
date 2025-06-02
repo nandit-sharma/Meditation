@@ -1,7 +1,9 @@
 #!/bin/bash
 
-echo "Installing dependencies..."
+echo "Building application..."
+cp -r ../*.html ../*.js ../*.css .
 npm install
+echo "Build complete!"
 
 echo "Creating data directory and file..."
 mkdir -p data

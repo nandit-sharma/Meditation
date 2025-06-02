@@ -2,11 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
+require('dotenv').config();
+
+const MeditationData = require('./models/MeditationData');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const dataFile = path.join(__dirname, 'data', 'data.json');
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -19,71 +21,20 @@ app.use(cors({
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
-let meditationData = {};
-
-function ensureDataFile() {
+async function connectDB() {
   try {
-    const dataDir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    if (!fs.existsSync(dataFile)) {
-      fs.writeFileSync(dataFile, JSON.stringify({}, null, 2), 'utf8');
-      console.log('Created new data file');
-    }
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    console.log('Connected to MongoDB');
   } catch (error) {
-    console.error('Error ensuring data file:', error);
-    throw error;
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
   }
 }
 
-function loadData() {
-  try {
-    ensureDataFile();
-    const data = fs.readFileSync(dataFile, 'utf8');
-    if (!data || data.trim() === '') {
-      console.log('Data file is empty, initializing with empty object');
-      meditationData = {};
-      saveData();
-      return;
-    }
-    try {
-      meditationData = JSON.parse(data);
-      console.log('Data loaded successfully');
-    } catch (parseError) {
-      console.error('Error parsing data file:', parseError);
-      console.log('Initializing with empty data due to parse error');
-      meditationData = {};
-      saveData();
-    }
-  } catch (error) {
-    console.error('Error loading data:', error);
-    console.log('Initializing with empty data');
-    meditationData = {};
-    saveData();
-  }
-}
-
-function saveData() {
-  try {
-    ensureDataFile();
-    const backupFile = `${dataFile}.backup`;
-    
-    if (fs.existsSync(dataFile)) {
-      fs.copyFileSync(dataFile, backupFile);
-    }
-    
-    const dataToSave = JSON.stringify(meditationData, null, 2);
-    fs.writeFileSync(dataFile, dataToSave, 'utf8');
-    console.log('Data saved successfully');
-    return true;
-  } catch (error) {
-    console.error('Error saving data:', error);
-    return false;
-  }
-}
-
-loadData();
+connectDB();
 
 app.use(express.static(path.join(__dirname, '../')));
 
@@ -91,17 +42,27 @@ app.get('/', (req, res) => {
   res.send('Meditation Tracker Backend is running!');
 });
 
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
   try {
     console.log('GET /api/data request received');
-    res.json(meditationData);
+    const allData = await MeditationData.find();
+    
+    const formattedData = {};
+    allData.forEach(record => {
+      if (!formattedData[record.user]) {
+        formattedData[record.user] = {};
+      }
+      formattedData[record.user][record.date] = record.completed;
+    });
+    
+    res.json(formattedData);
   } catch (error) {
     console.error('Error in GET /api/data:', error);
     res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
-app.post('/api/data', (req, res) => {
+app.post('/api/data', async (req, res) => {
   try {
     console.log('POST /api/data request received');
     if (!req.body || typeof req.body !== 'object') {
@@ -113,14 +74,26 @@ app.post('/api/data', (req, res) => {
       throw new Error('Empty data received');
     }
     
-    meditationData = newData;
-    const saved = saveData();
+    const operations = [];
     
-    if (saved) {
-      console.log('Data saved successfully:', meditationData);
-      res.json({ success: true, data: meditationData });
+    for (const [user, dates] of Object.entries(newData)) {
+      for (const [date, completed] of Object.entries(dates)) {
+        operations.push({
+          updateOne: {
+            filter: { user, date },
+            update: { $set: { completed } },
+            upsert: true
+          }
+        });
+      }
+    }
+    
+    if (operations.length > 0) {
+      await MeditationData.bulkWrite(operations);
+      console.log('Data saved successfully');
+      res.json({ success: true, data: newData });
     } else {
-      throw new Error('Failed to save data to file');
+      throw new Error('No data to save');
     }
   } catch (error) {
     console.error('Error in POST /api/data:', error);
@@ -136,5 +109,4 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Data file location: ${dataFile}`);
 }); 
