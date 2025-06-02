@@ -2,13 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const mongoose = require('mongoose');
 require('dotenv').config();
-
-const MeditationData = require('./models/MeditationData');
+const { Pool } = require('pg');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,  // This is your external PostgreSQL URL
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -21,20 +24,26 @@ app.use(cors({
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
-async function connectDB() {
+async function initializeDatabase() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    console.log('Connected to MongoDB');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meditation_data (
+        id SERIAL PRIMARY KEY,
+        user_name VARCHAR(50) NOT NULL,
+        date VARCHAR(10) NOT NULL,
+        completed BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_name, date)
+      )
+    `);
+    console.log('Database initialized successfully');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('Database initialization error:', error);
     process.exit(1);
   }
 }
 
-connectDB();
+initializeDatabase();
 
 app.use(express.static(path.join(__dirname, '../')));
 
@@ -45,14 +54,14 @@ app.get('/', (req, res) => {
 app.get('/api/data', async (req, res) => {
   try {
     console.log('GET /api/data request received');
-    const allData = await MeditationData.find();
+    const result = await pool.query('SELECT * FROM meditation_data');
     
     const formattedData = {};
-    allData.forEach(record => {
-      if (!formattedData[record.user]) {
-        formattedData[record.user] = {};
+    result.rows.forEach(record => {
+      if (!formattedData[record.user_name]) {
+        formattedData[record.user_name] = {};
       }
-      formattedData[record.user][record.date] = record.completed;
+      formattedData[record.user_name][record.date] = record.completed;
     });
     
     res.json(formattedData);
@@ -74,26 +83,30 @@ app.post('/api/data', async (req, res) => {
       throw new Error('Empty data received');
     }
     
-    const operations = [];
-    
-    for (const [user, dates] of Object.entries(newData)) {
-      for (const [date, completed] of Object.entries(dates)) {
-        operations.push({
-          updateOne: {
-            filter: { user, date },
-            update: { $set: { completed } },
-            upsert: true
-          }
-        });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      for (const [user, dates] of Object.entries(newData)) {
+        for (const [date, completed] of Object.entries(dates)) {
+          await client.query(
+            `INSERT INTO meditation_data (user_name, date, completed)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_name, date)
+             DO UPDATE SET completed = $3`,
+            [user, date, completed]
+          );
+        }
       }
-    }
-    
-    if (operations.length > 0) {
-      await MeditationData.bulkWrite(operations);
+      
+      await client.query('COMMIT');
       console.log('Data saved successfully');
       res.json({ success: true, data: newData });
-    } else {
-      throw new Error('No data to save');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
   } catch (error) {
     console.error('Error in POST /api/data:', error);
