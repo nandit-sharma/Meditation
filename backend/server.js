@@ -6,17 +6,17 @@ require('dotenv').config();
 const { Pool } = require('pg');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,  // This is your external PostgreSQL URL
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 120000,
+  idleTimeoutMillis: 120000
 });
 
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? '*'  // Allow all origins in production
-    : ['http://localhost:3000'],  // Only allow localhost in development
+  origin: '*',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
   credentials: true
@@ -119,7 +119,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 120000;
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    pool.end(() => {
+      console.log('Database pool closed');
+      process.exit(0);
+    });
+  });
 }); 
