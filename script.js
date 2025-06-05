@@ -1,5 +1,5 @@
 const users = ['Nandit', 'Daksh', 'Harish', 'Samar'];
-const startDate = new Date('2025-05-01');
+const startDate = new Date('2025-06-01');
 const endDate = new Date('2025-12-31');
 const storageKey = 'meditation-tracker-2025';
 const API_URL = 'https://meditation-2-2vb4.onrender.com/api';
@@ -131,19 +131,20 @@ function calculateBestStreak(userData) {
 function calculateSelfControl(userData) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
-  
+
   const monthStart = new Date(currentYear, currentMonth, 1);
-  const monthEnd = new Date(currentYear, currentMonth + 1, 0);
-  
-  const totalDays = today.getDate();
-  const dates = generateDates(monthStart, today).map(formatDate);
+  const tomorrow = new Date(today); // Include today in range
+  tomorrow.setDate(today.getDate() + 1);
+
+  const dates = generateDates(monthStart, tomorrow).map(formatDate);
   const totalTicks = dates.filter(date => userData[date]).length;
-  
-  return Math.round((totalTicks / totalDays) * 100);
+
+  return Math.round((totalTicks / (dates.length - 1)) * 100);
 }
+
 
 function isFutureDate(dateStr) {
   const today = new Date();
